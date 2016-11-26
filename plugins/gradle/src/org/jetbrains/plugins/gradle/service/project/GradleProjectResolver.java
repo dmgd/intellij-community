@@ -124,13 +124,13 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     }
 
     if (settings != null) {
-      myHelper.ensureInstalledWrapper(id, projectPath, settings, listener);
+      GradleExecutionHelper.ensureInstalledWrapper(id, projectPath, settings, listener);
     }
 
     final GradleProjectResolverExtension projectResolverChain = createProjectResolverChain(settings);
     DefaultProjectResolverContext resolverContext = new DefaultProjectResolverContext(id, projectPath, settings, listener, false);
     final DataNode<ProjectData> resultProjectDataNode = myHelper.execute(
-      projectPath, settings, new ProjectConnectionDataNodeFunction(resolverContext, projectResolverChain, false)
+      id, projectPath, settings, listener, new ProjectConnectionDataNodeFunction(resolverContext, projectResolverChain, false)
     );
 
     // auto-discover buildSrc project if needed
@@ -138,7 +138,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     DefaultProjectResolverContext buildSrcResolverCtx =
       new DefaultProjectResolverContext(id, buildSrcProjectPath, settings, listener, false);
     resolverContext.copyUserDataTo(buildSrcResolverCtx);
-    handleBuildSrcProject(resultProjectDataNode, new ProjectConnectionDataNodeFunction(buildSrcResolverCtx, projectResolverChain, true));
+    handleBuildSrcProject(resultProjectDataNode, new ProjectConnectionDataNodeFunction(buildSrcResolverCtx, projectResolverChain, true), id, listener);
     return resultProjectDataNode;
   }
 
@@ -732,7 +732,8 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
   }
 
   private void handleBuildSrcProject(@NotNull final DataNode<ProjectData> resultProjectDataNode,
-                                     @NotNull final ProjectConnectionDataNodeFunction projectConnectionDataNodeFunction) {
+                                     @NotNull final ProjectConnectionDataNodeFunction projectConnectionDataNodeFunction,
+                                     ExternalSystemTaskId id, ExternalSystemTaskNotificationListener listener) {
 
     final String projectPath = projectConnectionDataNodeFunction.myResolverContext.getProjectPath();
     if (!new File(projectPath).isDirectory()) {
@@ -753,7 +754,7 @@ public class GradleProjectResolver implements ExternalSystemProjectResolver<Grad
     if (buildSrcModuleDataNode != null) return;
 
     final DataNode<ProjectData> buildSrcProjectDataDataNode = myHelper.execute(
-      projectPath, projectConnectionDataNodeFunction.myResolverContext.getSettings(), projectConnectionDataNodeFunction);
+      id, projectPath, projectConnectionDataNodeFunction.myResolverContext.getSettings(), listener, projectConnectionDataNodeFunction);
 
     if (buildSrcProjectDataDataNode != null) {
       for (DataNode<ModuleData> moduleNode : ExternalSystemApiUtil.getChildren(buildSrcProjectDataDataNode, ProjectKeys.MODULE)) {

@@ -155,7 +155,7 @@ public class GradleTaskManager extends AbstractExternalSystemTaskManager<GradleE
       }
       return null;
     };
-    myHelper.execute(projectPath, settings, f);
+    myHelper.execute(id, projectPath, settings, listener, f);
   }
 
   @Override

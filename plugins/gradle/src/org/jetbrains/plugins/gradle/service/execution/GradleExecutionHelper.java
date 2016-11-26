@@ -82,9 +82,8 @@ public class GradleExecutionHelper {
     return result;
   }
 
-  @SuppressWarnings("MethodMayBeStatic")
   @NotNull
-  public BuildLauncher getBuildLauncher(@NotNull final ExternalSystemTaskId id,
+  public static BuildLauncher getBuildLauncher(@NotNull final ExternalSystemTaskId id,
                                         @NotNull ProjectConnection connection,
                                         @Nullable GradleExecutionSettings settings,
                                         @NotNull ExternalSystemTaskNotificationListener listener,
@@ -191,7 +190,11 @@ public class GradleExecutionHelper {
     operation.setStandardError(standardError);
   }
 
-  public <T> T execute(@NotNull String projectPath, @Nullable GradleExecutionSettings settings, @NotNull Function<ProjectConnection, T> f) {
+  public <T> T execute(@NotNull ExternalSystemTaskId id,
+                       @NotNull String projectPath,
+                       @Nullable GradleExecutionSettings settings,
+                       @NotNull ExternalSystemTaskNotificationListener listener,
+                       @NotNull Function<ProjectConnection, T> f) {
 
     final String projectDir;
     final File projectPathFile = new File(projectPath);
@@ -212,7 +215,7 @@ public class GradleExecutionHelper {
       catch (Exception ignore) {
       }
     }
-    ProjectConnection connection = getConnection(projectDir, settings);
+    ProjectConnection connection = getConnection(id, projectDir, settings, listener, false);
     try {
       return f.fun(connection);
     }
@@ -238,7 +241,7 @@ public class GradleExecutionHelper {
     }
   }
 
-  public void ensureInstalledWrapper(@NotNull ExternalSystemTaskId id,
+  public static void ensureInstalledWrapper(@NotNull ExternalSystemTaskId id,
                                      @NotNull String projectPath,
                                      @NotNull GradleExecutionSettings settings,
                                      @NotNull ExternalSystemTaskNotificationListener listener) {
@@ -251,7 +254,7 @@ public class GradleExecutionHelper {
     }
 
     final long ttlInMs = settings.getRemoteProcessIdleTtlInMs();
-    ProjectConnection connection = getConnection(projectPath, settings);
+    ProjectConnection connection = getConnection(id, projectPath, settings, listener, true);
     try {
       settings.setRemoteProcessIdleTtlInMs(100);
       try {
@@ -306,14 +309,18 @@ public class GradleExecutionHelper {
   /**
    * Allows to retrieve gradle api connection to use for the given project.
    *
-   * @param projectPath target project path
-   * @param settings    execution settings to use
+   * @param projectPath      target project path
+   * @param settings         execution settings to use
+   * @param resolvingWrapper are we resolving the gradle version wrapper?
    * @return connection to use
    * @throws IllegalStateException if it's not possible to create the connection
    */
   @NotNull
-  private static ProjectConnection getConnection(@NotNull String projectPath,
-                                                 @Nullable GradleExecutionSettings settings)
+  private static ProjectConnection getConnection(@NotNull ExternalSystemTaskId id,
+                                                 @NotNull String projectPath,
+                                                 @Nullable GradleExecutionSettings settings,
+                                                 @NotNull ExternalSystemTaskNotificationListener listener,
+                                                 boolean resolvingWrapper)
     throws IllegalStateException {
     File projectDir = new File(projectPath);
     GradleConnector connector = GradleConnector.newConnector();
@@ -335,6 +342,9 @@ public class GradleExecutionHelper {
           }
           break;
         case WRAPPED:
+          if (!resolvingWrapper && settings.getWrapperPropertyFile() == null) {
+            ensureInstalledWrapper(id, projectPath, settings, listener);
+          }
           if (settings.getWrapperPropertyFile() != null) {
             File propertiesFile = new File(settings.getWrapperPropertyFile());
             if (propertiesFile.exists()) {
